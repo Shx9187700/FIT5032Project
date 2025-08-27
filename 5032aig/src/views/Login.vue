@@ -75,12 +75,20 @@ const handleLogin = () => {
   validateName(true);
   validatePassword(true);
   if (!errors.value.username && !errors.value.password) {
+    // if admin
+    if (formData.value.username === "admin" && formData.value.password === "Admin123!") {
+      alert("Welcome Admin!");
+      router.push("/admin");
+      return;
+    }
+      //if user
     const users = JSON.parse(localStorage.getItem("users") || "[]");
     const found = users.find(u => u.username === formData.value.username && u.password === formData.value.password);
 
     if (found) {
       alert(`Welcome back, ${found.username}!`);
       localStorage.setItem("loggedInUser", JSON.stringify(found));
+      router.push("/profile");
     } else {
       alert("Invalid username or password.");
     }

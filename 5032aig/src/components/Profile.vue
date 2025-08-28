@@ -1,15 +1,17 @@
 <template>
   <div class="container mt-5">
     <h2 class="text-center mb-4">User Profile</h2>
-    
-    <DataTable v-if = "user" :value="[user]" responsiveLayout = "scroll" style="width: 100%;">
-      <Column field="username" header="Username"></Column>
-      <Column field="email" header="Email"></Column>
-      <Column field="age" header="Age"></Column>
-    </DataTable>
-    <div v-else class="text-center">
-        <p>No user logged in.</p>
+
+    <div v-if="user" class="profile-info">
+      <p><strong>Username:</strong> {{ user.username }}</p>
+      <p><strong>Email:</strong> {{ user.email }}</p>
+      <p><strong>Age:</strong> {{ user.age }}</p>
     </div>
+
+    <div v-else class="text-center">
+      <p>No user logged in.</p>
+    </div>
+
     <div class="text-center mt-4">
       <button class="btn btn-danger" @click="logout">Logout</button>
     </div>
@@ -18,8 +20,6 @@
 
 <script setup>
 import { ref, onMounted } from "vue";
-import DataTable from 'primevue/datatable';
-import Column from 'primevue/column';
 import { useRouter } from "vue-router";
 
 const router = useRouter();
@@ -40,3 +40,12 @@ function logout() {
   router.push("/login");
 }
 </script>
+
+<style scoped>
+.profile-info {
+  font-size: 1.2rem;
+  line-height: 2;
+  max-width: 500px;
+  margin: 0 auto;
+}
+</style>

@@ -29,6 +29,12 @@ import { useRouter } from "vue-router";
 const router = useRouter();
 const users = ref([]);
 
+const loggedIn = JSON.parse(localStorage.getItem("loggedInUser") || "null");
+if (!loggedIn) {
+  alert("Please login first!");
+  router.push("/login");
+}
+
 onMounted(() => {
   const data = JSON.parse(localStorage.getItem("users") || "[]");
   users.value = data;

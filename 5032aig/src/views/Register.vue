@@ -98,6 +98,12 @@ function handleRegister() {
     return;
   }
 
+  const exists = users.find(u => u.username === username.value || u.email === email.value);
+  if (exists) {
+    alert("Username or Email already exists.");
+    return;
+  }
+
   const users = JSON.parse(localStorage.getItem("users") || "[]");
   users.push({ username: username.value, email: email.value, password: password.value, age: age.value });
   localStorage.setItem("users", JSON.stringify(users));

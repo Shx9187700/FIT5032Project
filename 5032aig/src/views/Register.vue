@@ -58,6 +58,14 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 
+users.push({ 
+  username: username.value, 
+  email: email.value, 
+  password: password.value, 
+  age: age.value, 
+  role: "user"
+});
+
 const username = ref("");
 const email = ref("");
 const password = ref("");

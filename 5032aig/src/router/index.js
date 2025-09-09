@@ -32,4 +32,25 @@ const router = createRouter({
   ],
 })
 
+router.beforeEach((to, from, next) => {
+  const loggedIn = JSON.parse(localStorage.getItem("loggedInUser") || "null");
+
+  if (!loggedIn && to.path !== "/login" && to.path !== "/register") {
+    alert("Please login first!");
+    return next("/login");
+  }
+
+  if (to.path === "/admin" && loggedIn?.role !== "admin") {
+    alert("Access denied: Admins only!");
+    return next("/login");
+  }
+
+  if (to.path === "/profile" && loggedIn?.role !== "user") {
+    alert("Access denied: Users only!");
+    return next("/login");
+  }
+
+  next();
+});
+
 export default router

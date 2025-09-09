@@ -77,11 +77,13 @@ const handleLogin = () => {
   if (!errors.value.username && !errors.value.password) {
     // if admin
     if (formData.value.username === "admin" && formData.value.password === "Admin123!") {
+      const adminUser = { username: "admin", email: "admin@example.com", role: "admin" };
+      localStorage.setItem("loggedInUser", JSON.stringify(adminUser));
       alert("Welcome Admin!");
       router.push("/admin");
       return;
     }
-      //if user
+    //if user
     const users = JSON.parse(localStorage.getItem("users") || "[]");
     const found = users.find(u => u.username === formData.value.username && u.password === formData.value.password);
 

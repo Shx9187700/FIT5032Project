@@ -58,14 +58,6 @@
 import { ref } from "vue";
 import { useRouter } from "vue-router";
 
-users.push({ 
-  username: username.value, 
-  email: email.value, 
-  password: password.value, 
-  age: age.value, 
-  role: "user"
-});
-
 const username = ref("");
 const email = ref("");
 const password = ref("");
@@ -106,18 +98,28 @@ function handleRegister() {
     return;
   }
 
+  const users = JSON.parse(localStorage.getItem("users") || "[]");
+
+  // check if exsist same user or email
   const exists = users.find(u => u.username === username.value || u.email === email.value);
   if (exists) {
     alert("Username or Email already exists.");
     return;
   }
 
-  const users = JSON.parse(localStorage.getItem("users") || "[]");
-  users.push({ username: username.value, email: email.value, password: password.value, age: age.value });
+  // new user for role = "user"
+  users.push({ 
+    username: username.value, 
+    email: email.value, 
+    password: password.value, 
+    age: age.value, 
+    role: "user"
+  });
+
   localStorage.setItem("users", JSON.stringify(users));
 
   alert("Registration successful! Redirecting to login...");
-  router.push("/login"); // automatically go back to login
+  router.push("/login");
 }
 </script>
 

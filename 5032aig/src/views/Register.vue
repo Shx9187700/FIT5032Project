@@ -145,6 +145,12 @@ function handleRegister() {
 
   const users = JSON.parse(localStorage.getItem('users') || '[]')
 
+  //check if user register admin
+  if (username.value.toLowerCase() === "admin") {
+  alert("The username 'admin' is reserved and cannot be used.");
+  return;
+}
+
   // check if exist same user or email
   const exists = users.find(u => u.username === username.value || u.email === email.value)
   if (exists) {

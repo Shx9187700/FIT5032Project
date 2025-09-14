@@ -2,7 +2,7 @@
   <div class="container mt-5">
     <div class="row">
       <div class="col-md-6 offset-md-3">
-        <h1 class="text-center">Login</h1>
+        <h1 class="text-center">AIG Login</h1>
         <form @submit.prevent="handleLogin">
           <!-- Username -->
           <div class="mb-3">
@@ -40,6 +40,22 @@
 <script setup>
 import { ref } from 'vue';
 import { useRouter } from 'vue-router';
+
+function sanitizeInput(str) {
+  return str.replace(/&/g, "&amp;")
+            .replace(/</g, "&lt;")
+            .replace(/>/g, "&gt;")
+            .replace(/"/g, "&quot;")
+            .replace(/'/g, "&#039;");
+}
+
+function decodeInput(str) {
+  return str.replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'")
+            .replace(/&amp;/g, "&");
+}
 
 const router = useRouter();
 
@@ -85,10 +101,12 @@ const handleLogin = () => {
     }
     //if user
     const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const found = users.find(u => u.username === formData.value.username && u.password === formData.value.password);
+    const sanitizedUsername = sanitizeInput(formData.value.username);
+    const hashedInputPassword = btoa(formData.value.password);
+    const found = users.find(u => u.username === sanitizedUsername && u.password === hashedInputPassword);
 
     if (found) {
-      alert(`Welcome back, ${found.username}!`);
+      alert(`Welcome back, ${decodeInput(found.username)}!`);
       localStorage.setItem("loggedInUser", JSON.stringify(found));
       router.push("/profile");
     } else {

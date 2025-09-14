@@ -3,7 +3,7 @@
     <h2 class="text-center mb-4">User Profile</h2>
 
     <div v-if="user" class="profile-info">
-      <p><strong>Username:</strong> {{ user.username }}</p>
+      <p><strong>Username:</strong> <span v-text="decodeInput(user.username)"></span></p>
       <p><strong>Email:</strong> {{ user.email }}</p>
       <p><strong>Age:</strong> {{ user.age }}</p>
     </div>
@@ -43,6 +43,15 @@ const router = useRouter();
 const user = ref(null);
 const userRating = ref(0);
 const hasSubmitted = ref(false);
+
+function decodeInput(str) {
+  return str.replace(/&lt;/g, "<")
+            .replace(/&gt;/g, ">")
+            .replace(/&quot;/g, '"')
+            .replace(/&#039;/g, "'")
+            .replace(/&amp;/g, "&");
+}
+
 
 onMounted(() => {
   const loggedIn = JSON.parse(localStorage.getItem("loggedInUser") || "null");

@@ -2,32 +2,41 @@
   <div class="container mt-5">
     <div class="row">
       <div class="col-md-6 offset-md-3">
-        <h1 class="text-center">AIG Login</h1>
+        <h2 class="text-center mb-4">AIG Login</h2>
+
         <form @submit.prevent="handleLogin">
-          <!-- Username -->
+          <!-- Email -->
           <div class="mb-3">
-            <label for="username" class="form-label">Username</label>
-            <input type="text" class="form-control" id="username"
-              v-model="formData.username"
-              @blur="() => validateName(true)"
-              @input="() => validateName(false)">
-            <div v-if="errors.username" class="text-danger">{{ errors.username }}</div>
+            <label class="form-label">Email</label>
+            <input 
+              v-model="email" 
+              type="email" 
+              class="form-control" 
+              required
+              @blur="() => validateEmail(true)"
+              @input="() => validateEmail(false)"
+            />
+            <div v-if="errors.email" class="text-danger">{{ errors.email }}</div>
           </div>
 
           <!-- Password -->
           <div class="mb-3">
-            <label for="password" class="form-label">Password</label>
-            <input type="password" class="form-control" id="password"
-              v-model="formData.password"
+            <label class="form-label">Password</label>
+            <input 
+              v-model="password" 
+              type="password" 
+              class="form-control" 
+              required
               @blur="() => validatePassword(true)"
-              @input="() => validatePassword(false)">
+              @input="() => validatePassword(false)"
+            />
             <div v-if="errors.password" class="text-danger">{{ errors.password }}</div>
           </div>
 
           <!-- Buttons -->
           <div class="text-center">
             <button type="submit" class="btn btn-primary me-2">Login</button>
-            <button type="button" class="btn btn-secondary" @click="goToRegister">Register</button>
+            <router-link to="/register" class="btn btn-secondary">Register</router-link>
           </div>
         </form>
       </div>
@@ -35,105 +44,83 @@
   </div>
 </template>
 
-
-
 <script setup>
-import { ref } from 'vue';
-import { useRouter } from 'vue-router';
+import { ref } from "vue";
+import { useRouter } from "vue-router";
+import { signInWithEmailAndPassword } from "firebase/auth";
+import { doc, getDoc } from "firebase/firestore";
+import { auth, db } from "../firebase/init.js";
 
-function sanitizeInput(str) {
-  return str.replace(/&/g, "&amp;")
-            .replace(/</g, "&lt;")
-            .replace(/>/g, "&gt;")
-            .replace(/"/g, "&quot;")
-            .replace(/'/g, "&#039;");
-}
-
-function decodeInput(str) {
-  return str.replace(/&lt;/g, "<")
-            .replace(/&gt;/g, ">")
-            .replace(/&quot;/g, '"')
-            .replace(/&#039;/g, "'")
-            .replace(/&amp;/g, "&");
-}
-
-const router = useRouter();
-
-const formData = ref({
-  username: '',
-  password: ''
-});
-
+const email = ref("");
+const password = ref("");
 const errors = ref({
-  username: null,
+  email: null,
   password: null
 });
+const router = useRouter();
 
-const validateName = (blur) => {
-  if (formData.value.username.length < 3) {
-    if (blur) errors.value.username = "Username must be at least 3 characters.";
+// Email validation
+const validateEmail = (blur) => {
+  const emailPattern = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  if (!emailPattern.test(email.value)) {
+    if (blur) errors.value.email = "Invalid email format.";
   } else {
-    errors.value.username = null;
+    errors.value.email = null;
   }
 };
 
+// Password validation
 const validatePassword = (blur) => {
-  const password = formData.value.password;
   const minLength = 6;
-  if (password.length < minLength) {
-    if (blur) errors.value.password = `Password must be at least ${minLength} characters long.`;
+  if (password.value.length < minLength) {
+    if (blur) errors.value.password = `Password must be at least ${minLength} characters.`;
   } else {
     errors.value.password = null;
   }
 };
 
-const handleLogin = () => {
-  validateName(true);
+async function handleLogin() {
+  validateEmail(true);
   validatePassword(true);
-  if (!errors.value.username && !errors.value.password) {
-    // if admin
-    if (formData.value.username === "admin" && formData.value.password === "Admin123!") {
-      const adminUser = { username: "admin", email: "admin@example.com", role: "admin" };
-      localStorage.setItem("loggedInUser", JSON.stringify(adminUser));
-      alert("Welcome Admin!");
-      router.push("/admin");
-      return;
-    }
-    //if user
-    const users = JSON.parse(localStorage.getItem("users") || "[]");
-    const sanitizedUsername = sanitizeInput(formData.value.username);
-    const hashedInputPassword = btoa(formData.value.password);
-    const found = users.find(u => u.username === sanitizedUsername && u.password === hashedInputPassword);
 
-    if (found) {
-      alert(`Welcome back, ${decodeInput(found.username)}!`);
-      localStorage.setItem("loggedInUser", JSON.stringify(found));
-      router.push("/profile");
-    } else {
-      alert("Invalid username or password.");
-    }
+  if (errors.value.email || errors.value.password) {
+    alert("Please correct the errors before submitting.");
+    return;
   }
-};
 
-const goToRegister = () => {
-  router.push("/register");
-};
+  try {
+    // Step 1: Authenticate user with Firebase
+    const userCredential = await signInWithEmailAndPassword(auth, email.value, password.value);
+    const user = userCredential.user;
+
+    const adminRef = doc(db, "admins", user.uid)
+    const adminSnap = await getDoc(adminRef)
+
+    if (adminSnap.exists() && adminSnap.data().role === "admin"){
+      localStorage.setItem("loggedInUser", JSON.stringify({ email: user.email, role: "admin"}))
+      alert("Welcome, Admin!")
+      router.push("/admin")
+      return
+    }
+
+    const userRef = doc(db, "users", user.uid)
+    const userSnap = await getDoc(userRef)
+    if (userSnap.exists()) {
+      localStorage.setItem("loggedInUser", JSON.stringify(userSnap.data()))
+      alert(`Welcome, ${userSnap.data().username}!`)
+      router.push("/profile")
+    } else {
+      alert("No user data found.")
+    }
+  } catch (error) {
+    // Step 5: Handle login errors
+    alert(`Login failed: ${error.message}`);
+  }
+}
 </script>
 
-
 <style scoped>
-   .card {
-   border: 1px solid #ccc;
-   border-radius: 10px;
-   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-   }
-   .card-header {
-   background-color: #275FDA;
-   color: white;
-   padding: 10px;
-   border-radius: 10px 10px 0 0;
-   }
-   .list-group-item {
-   padding: 10px;
-   }
+.container {
+  max-width: 600px;
+}
 </style>

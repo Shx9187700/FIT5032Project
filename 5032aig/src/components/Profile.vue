@@ -1,113 +1,67 @@
 <template>
-  <div class="container mt-5">
-    <h2 class="text-center mb-4">User Profile</h2>
+  <div class="container mt-5" v-if="userData">
+    <h2 class="text-center mb-4">👤 User Profile</h2>
 
-    <div v-if="user" class="profile-info">
-      <p><strong>Username:</strong> <span v-text="decodeInput(user.username)"></span></p>
-      <p><strong>Email:</strong> {{ user.email }}</p>
-      <p><strong>Age:</strong> {{ user.age }}</p>
+    <div class="card p-4 shadow-sm">
+      <p><strong>Username:</strong> {{ userData.username }}</p>
+      <p><strong>Email:</strong> {{ userData.email }}</p>
+      <p><strong>Age:</strong> {{ userData.age }}</p>
+      <p><strong>Role:</strong> {{ userData.role }}</p>
+
+      <!-- rating part -->
+      <Rating />
+
+      <button class="btn btn-danger mt-3" @click="logout">Logout</button>
     </div>
+  </div>
 
-    <div v-else class="text-center">
-      <p>No user logged in.</p>
-    </div>
-
-    <!-- Rating Section -->
-    <div v-if="user" class="rating-section mt-4">
-      <!-- before submit -->
-      <div v-if="!hasSubmitted">
-        <h4>Rate this App</h4>
-        <Rating v-model="userRating" :cancel="false" />
-        <button class="btn btn-success mt-2" @click="submitRating">Submit Rating</button>
-      </div>
-
-      <!-- after submit -->
-      <div v-else>
-        <p class="mt-2">Your Rating: {{ userRating }} / 5</p>
-        <button class="btn btn-warning mt-2" @click="enableReRate">Re-rate</button>
-      </div>
-    </div>
-
-    <div class="text-center mt-4">
-      <button class="btn btn-danger" @click="logout">Logout</button>
-    </div>
+  <div v-else class="text-center mt-5">
+    <p>Loading user data...</p>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue";
-import { useRouter } from "vue-router";
-import Rating from "primevue/rating";
+import { ref, onMounted } from "vue"
+import { useRouter } from "vue-router"
+import { doc, getDoc } from "firebase/firestore"
+import { auth, db } from "../firebase/init.js"
+import { onAuthStateChanged, signOut } from "firebase/auth"
+import Rating from "../components/rating.vue"
 
-const router = useRouter();
-const user = ref(null);
-const userRating = ref(0);
-const hasSubmitted = ref(false);
-
-function decodeInput(str) {
-  return str.replace(/&lt;/g, "<")
-            .replace(/&gt;/g, ">")
-            .replace(/&quot;/g, '"')
-            .replace(/&#039;/g, "'")
-            .replace(/&amp;/g, "&");
-}
-
+const router = useRouter()
+const userData = ref({})
 
 onMounted(() => {
-  const loggedIn = JSON.parse(localStorage.getItem("loggedInUser") || "null");
-  if (!loggedIn) {
-    alert("Please login first!");
-    router.push("/login");
-  } else {
-    user.value = loggedIn;
-
-    // read the last score
-    const ratings = JSON.parse(localStorage.getItem("ratings") || "[]");
-    const found = ratings.find(r => r.username === loggedIn.username);
-    if (found) {
-      userRating.value = found.score;
-      hasSubmitted.value = true; // if already rate, just go after submit
+  onAuthStateChanged(auth, async (user) => {
+    if (user) {
+      const docRef = doc(db, "users", user.uid)
+      const docSnap = await getDoc(docRef)
+      if (docSnap.exists()) {
+        userData.value = docSnap.data()
+      } else {
+        console.error("No such document in Firestore!")
+      }
+    } else {
+      alert("You must log in to access your profile.")
+      router.push("/login")
     }
-  }
-});
+  })
+})
 
-function submitRating() {
-  if (!user.value) return;
-
-  const ratings = JSON.parse(localStorage.getItem("ratings") || "[]");
-
-  // add or update the score
-  const existingIndex = ratings.findIndex(r => r.username === user.value.username);
-  if (existingIndex !== -1) {
-    ratings[existingIndex].score = userRating.value;
-  } else {
-    ratings.push({ username: user.value.username, score: userRating.value });
-  }
-
-  localStorage.setItem("ratings", JSON.stringify(ratings));
-  hasSubmitted.value = true; // change to already submit
-}
-
-function enableReRate() {
-  hasSubmitted.value = false; // show the rate scetion
-}
-
-function logout() {
-  localStorage.removeItem("loggedInUser");
-  router.push("/login");
+async function logout() {
+  await signOut(auth)
+  localStorage.removeItem("loggedInUser")
+  alert("You have been logged out.")
+  router.push("/login")
 }
 </script>
 
 <style scoped>
-.profile-info {
-  font-size: 1.2rem;
-  line-height: 2;
-  max-width: 500px;
-  margin: 0 auto;
+.container {
+  max-width: 600px;
 }
-.rating-section {
-  max-width: 400px;
-  margin: 0 auto;
-  text-align: center;
+.card {
+  border-radius: 10px;
+  background-color: #f8f9fa;
 }
 </style>

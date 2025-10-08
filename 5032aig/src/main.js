@@ -1,6 +1,6 @@
 import 'bootstrap/dist/css/bootstrap.min.css'
 import primeVue from 'primevue/config';
-import Aura from '@Primeuix/themes/aura';
+import Aura from '@primeuix/themes/aura';
 // import './assets/main.css'
 
 import { createApp } from 'vue'

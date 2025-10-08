@@ -2,7 +2,7 @@
   <div class="rating-container mt-5">
     <h3 class="text-center mb-3">🌟 Rate This App</h3>
 
-    <!-- when no score -->
+    <!-- if not rate -->
     <div v-if="!hasRated" class="star-group text-center">
       <p>Click to rate:</p>
       <div>
@@ -16,10 +16,9 @@
       </div>
     </div>
 
-    <!-- already rate -->
+    <!-- if rated -->
     <div v-else class="text-center mt-3">
-      <p><strong>Your Rating:</strong> {{ userRating }} ⭐</p>
-      <p><strong>Average Rating:</strong> {{ averageRating.toFixed(2) }} ⭐</p>
+      <p><strong>Your Last Rating:</strong> {{ userRating }} ⭐</p>
       <button class="btn btn-warning mt-2" @click="allowRerate">Re-rate</button>
     </div>
   </div>
@@ -29,26 +28,27 @@
 import { ref, onMounted } from "vue"
 import { auth, db } from "../firebase/init.js"
 import { onAuthStateChanged } from "firebase/auth"
-import { doc, setDoc, getDoc, getDocs, collection } from "firebase/firestore"
+import { doc, setDoc, getDoc } from "firebase/firestore"
 
-const userRating = ref(0)       
-const hasRated = ref(false)     
-const averageRating = ref(0)     
-let currentUser = null   
+//  v-model
+const props = defineProps({
+  modelValue: { type: Number, default: 0 }
+})
+const emit = defineEmits(["update:modelValue"])
 
+const userRating = ref(props.modelValue)
+const hasRated = ref(false)
+let currentUser = null
 
+// get last score
 onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     if (user) {
       currentUser = user
       await fetchUserRating()
-      await calculateAverage()
-    } else {
-      alert("You must log in to rate this app.")
     }
   })
 })
-
 
 async function fetchUserRating() {
   const docRef = doc(db, "ratings", currentUser.uid)
@@ -59,9 +59,9 @@ async function fetchUserRating() {
   }
 }
 
-
 async function setRating(star) {
   userRating.value = star
+  emit("update:modelValue", star) 
   await setDoc(doc(db, "ratings", currentUser.uid), {
     userId: currentUser.uid,
     username: currentUser.displayName || "Anonymous",
@@ -71,24 +71,10 @@ async function setRating(star) {
   })
   alert(`Thanks for rating ${star} stars!`)
   hasRated.value = true
-  await calculateAverage()
 }
-
 
 function allowRerate() {
   hasRated.value = false
-}
-
-
-async function calculateAverage() {
-  const querySnapshot = await getDocs(collection(db, "ratings"))
-  let total = 0
-  let count = 0
-  querySnapshot.forEach(doc => {
-    total += doc.data().rating
-    count++
-  })
-  averageRating.value = count > 0 ? total / count : 0
 }
 </script>
 

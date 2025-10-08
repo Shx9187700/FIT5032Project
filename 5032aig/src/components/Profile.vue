@@ -1,6 +1,6 @@
 <template>
   <div class="container mt-5" v-if="userData">
-    <h2 class="text-center mb-4">👤 User Profile</h2>
+    <h2 class="text-center mb-4">User Profile</h2>
 
     <div class="card p-4 shadow-sm">
       <p><strong>Username:</strong> {{ userData.username }}</p>
@@ -8,10 +8,49 @@
       <p><strong>Age:</strong> {{ userData.age }}</p>
       <p><strong>Role:</strong> {{ userData.role }}</p>
 
-      <!-- rating part -->
-      <Rating />
+      <!-- Rating Section -->
+      <div class="rating-section mt-3 text-center">
+        <h5>Rate this App</h5>
+        <Rating v-model="userRating" :cancel="false" />
+        <p v-if="rated" class="mt-2 text-success">Thank you for your rating!</p>
+      </div>
 
-      <button class="btn btn-danger mt-3" @click="logout">Logout</button>
+      <!-- Feedback Section (shows only after rating) -->
+      <div v-if="rated" class="feedback-box mt-4">
+        <h6>We'd love to hear more from you</h6>
+
+        <textarea
+          v-model="feedback"
+          class="form-control mb-3"
+          placeholder="Write your feedback or suggestions here..."
+          rows="4"
+        ></textarea>
+
+        <input type="file" class="form-control mb-3" @change="onFileChange" />
+
+        <button class="btn btn-primary w-100" @click="sendFeedback" :disabled="sending">
+          {{ sending ? "Sending..." : "Send Feedback" }}
+        </button>
+
+        <p v-if="sent" class="mt-2 text-success text-center">Feedback sent successfully!</p>
+      </div>
+
+      <!-- EmailSender (hidden, triggered programmatically) -->
+      <EmailSender
+        v-if="triggerEmail"
+        :user-to="userData.email" 
+        :admin-to="'hsha0055@student.monash.edu'"   
+        :user-subject="'Thanks for your feedback!'"  
+        :user-text="'Thanks for your feedback!'"   
+        :admin-subject="'New Feedback from ' + userData.username" 
+        :admin-text="feedbackEmailContent"         
+        :reply-to="userData.email"                
+        :attachment="pendingAttachment"     
+        :trigger="triggerEmail"
+        @done="onEmailDone"
+      />
+
+      <button class="btn btn-danger mt-4 w-100" @click="logout">Logout</button>
     </div>
   </div>
 
@@ -21,36 +60,102 @@
 </template>
 
 <script setup>
-import { ref, onMounted } from "vue"
+import { ref, onMounted, watch } from "vue"
 import { useRouter } from "vue-router"
 import { doc, getDoc } from "firebase/firestore"
 import { auth, db } from "../firebase/init.js"
 import { onAuthStateChanged, signOut } from "firebase/auth"
-import Rating from "../components/rating.vue"
+import Rating from "../components/Rating.vue"
+import EmailSender from "../components/EmailSender.vue"
+
 
 const router = useRouter()
-const userData = ref({})
+const userData = ref(null)
+const userRating = ref(0)
+const rated = ref(false)
+
+const feedback = ref("")             // user's feedback
+const sending = ref(false)           // 
+const sent = ref(false)              // send status
+const triggerEmail = ref(false)      // EmailSender
+const feedbackEmailContent = ref("") // email content
 
 onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     if (user) {
-      const docRef = doc(db, "users", user.uid)
-      const docSnap = await getDoc(docRef)
+      const docSnap = await getDoc(doc(db, "users", user.uid))
       if (docSnap.exists()) {
         userData.value = docSnap.data()
       } else {
-        console.error("No such document in Firestore!")
+        console.error("No such user document found.")
       }
     } else {
-      alert("You must log in to access your profile.")
       router.push("/login")
     }
   })
 })
 
+watch(userRating, (newValue) => {
+  if (newValue > 0) {
+    rated.value = true
+  }
+})
+
+async function sendFeedback() {
+  if (!feedback.value.trim()) {
+    return;
+  }
+  sending.value = true;
+  sent.value = false;
+
+  feedbackEmailContent.value =
+    `User: ${userData.value.username}\n` +
+    `Email: ${userData.value.email}\n` +
+    `Rating: ${userRating.value} stars\n\n` +
+    `Feedback:\n${feedback.value}`;
+
+  triggerEmail.value = true;
+}
+
+function onEmailDone(result) {
+  sending.value = false;
+  triggerEmail.value = false;
+  if (result.ok) {
+    sent.value = true;
+    feedback.value = "";
+  } else {
+    alert("Send failed: " + (result.error || ""));
+  }
+}
+
+const pendingAttachment = ref(null);
+
+function onFileChange(e) {
+  const file = e.target.files?.[0];
+  if (!file) { pendingAttachment.value = null; return; }
+
+  readFileAsBase64(file).then((base64) => {
+    const [prefix, content] = base64.split('base64,');
+    const mime = (prefix.match(/^data:(.+);base64,/) || [])[1] || 'application/octet-stream';
+    pendingAttachment.value = {
+      filename: file.name,
+      contentBase64: content,
+      mimeType: mime
+    };
+  });
+}
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
 async function logout() {
   await signOut(auth)
-  localStorage.removeItem("loggedInUser")
   alert("You have been logged out.")
   router.push("/login")
 }
@@ -61,7 +166,28 @@ async function logout() {
   max-width: 600px;
 }
 .card {
-  border-radius: 10px;
+  border-radius: 14px;
   background-color: #f8f9fa;
+}
+.rating-section h5 {
+  color: #444;
+  margin-bottom: 10px;
+}
+.feedback-box {
+  background-color: #f0f4ff;
+  padding: 20px;
+  border-radius: 12px;
+  min-height: 200px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+.feedback-box textarea {
+  resize: none;
+  font-size: 0.95rem;
+  border-radius: 8px;
+}
+button {
+  font-weight: 500;
 }
 </style>

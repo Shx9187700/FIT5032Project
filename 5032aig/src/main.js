@@ -1,5 +1,5 @@
 import 'bootstrap/dist/css/bootstrap.min.css'
-import PrimeVue from 'primevue/config';
+import primeVue from 'primevue/config';
 import Aura from '@Primeuix/themes/aura';
 // import './assets/main.css'
 
@@ -8,7 +8,7 @@ import App from './App.vue'
 import router from './router'
 
 const app = createApp(App);
-app.use(PrimeVue, {
+app.use(primeVue, {
     theme:{
         present: Aura
     }

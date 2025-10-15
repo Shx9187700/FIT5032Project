@@ -1,6 +1,6 @@
 <template>
   <div class="rating-container mt-5">
-    <h3 class="text-center mb-3">🌟 Rate This App</h3>
+    <h3 class="text-center mb-3">🌟 Rate This Web</h3>
 
     <!-- if not rate -->
     <div v-if="!hasRated" class="star-group text-center">

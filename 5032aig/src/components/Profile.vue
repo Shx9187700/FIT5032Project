@@ -19,12 +19,13 @@
       <div v-if="rated" class="feedback-box mt-4">
         <h6>We'd love to hear more from you</h6>
 
-        <textarea
+        <CKEditor 
+          :editor="ClassicEditor"
           v-model="feedback"
-          class="form-control mb-3"
-          placeholder="Write your feedback or suggestions here..."
-          rows="4"
-        ></textarea>
+          :config="{
+            toolbar: ['bold', 'italic', 'underline', 'link', 'bulletedList', 'numberedList', 'undo', 'redo']
+          }"
+        />
 
         <input type="file" class="form-control mb-3" @change="onFileChange" />
 
@@ -68,17 +69,22 @@ import { onAuthStateChanged, signOut } from "firebase/auth"
 import Rating from "../components/Rating.vue"
 import EmailSender from "../components/EmailSender.vue"
 
+import CKEditorComponent from '@ckeditor/ckeditor5-vue'
+import ClassicEditor from '@ckeditor/ckeditor5-build-classic'
+
+const CKEditor = CKEditorComponent.component
+
 
 const router = useRouter()
 const userData = ref(null)
 const userRating = ref(0)
 const rated = ref(false)
 
-const feedback = ref("")             // user's feedback
-const sending = ref(false)           // 
-const sent = ref(false)              // send status
-const triggerEmail = ref(false)      // EmailSender
-const feedbackEmailContent = ref("") // email content
+const feedback = ref("") 
+const sending = ref(false)
+const sent = ref(false)     
+const triggerEmail = ref(false) 
+const feedbackEmailContent = ref("")
 
 onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
@@ -187,6 +193,40 @@ async function logout() {
   font-size: 0.95rem;
   border-radius: 8px;
 }
+
+:deep(.ck-editor__editable_inline) {
+  min-height: 300px;
+  max-height: 500px;
+  font-size: 1rem;
+  line-height: 1.6;
+  background-color: #fff;
+  border-radius: 10px;
+  border: 1px solid #cfd8dc;
+  padding: 14px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+:deep(.ck.ck-editor) {
+  width: 100%;
+  margin-bottom: 15px;
+}
+
+.ck-editor__editable_inline {
+  min-height: 250px;
+  max-height: 400px;
+  font-size: 1.5;
+  background-color: #fff;
+  border-radius: 10px;
+  border: 1px solid #cfd8dc;
+  padding: 12px;
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.ck.ck-editor {
+  width: 100%;
+  margin-bottom: 15px;
+}
+
 button {
   font-weight: 500;
 }

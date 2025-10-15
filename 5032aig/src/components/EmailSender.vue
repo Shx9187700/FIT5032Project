@@ -28,10 +28,8 @@ const statusMessage = ref("");
 const showStatus = ref(false);
 const alertClass = ref("alert-info");
 
-// ✅ 提前定义（用 ref 最稳）
 const inflight = ref(false);
 
-// 挂载时立刻检查一次；之后 trigger 变 true 也会触发
 watch(
   () => props.trigger,
   async (newVal) => {
@@ -63,8 +61,10 @@ async function sendEmail() {
         adminTo: props.adminTo,
         userSubject: props.userSubject,
         userText: props.userText,
+        userHtml: props.userText,
         adminSubject: props.adminSubject,
         adminText: props.adminText,
+        adminHtml: props.adminText,
         replyTo: props.replyTo,
         attachment: props.attachment || undefined,
       },
@@ -75,6 +75,9 @@ async function sendEmail() {
       statusMessage.value = "Email(s) sent successfully!";
       alertClass.value = "alert-success";
       emit("done", { ok: true });
+      setTimeout(()=>{
+        showStatus.value = false;
+      },5000);
     } else {
       const err = res.data?.error || "Unknown";
       statusMessage.value = "Failed to send email.";

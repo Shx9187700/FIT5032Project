@@ -4,8 +4,6 @@
       <h1>💙 Admin Dashboard</h1>
       <p>Monitor users and their emotional well-being insights</p>
     </header>
-
-    <!-- 未授权 -->
     <div v-if="!isAdmin" class="unauthorized">
       <div class="unauth-card">
         <h3>🚫 Access Denied</h3>
@@ -13,8 +11,6 @@
         <button class="btn-main" @click="goBackLogin">Back to Login</button>
       </div>
     </div>
-
-    <!-- 授权后 Dashboard -->
     <div v-else class="dashboard fade-in">
       <div class="card shadow">
         <div class="section-header">
@@ -25,7 +21,6 @@
         </p>
 
         <div class="table-container">
-          <!-- 全局搜索 -->
           <div class="mb-3 flex justify-end gap-1">
             <span class="p-input-icon-left">
               <i class="pi pi-search" />
@@ -33,16 +28,17 @@
                 v-model="globalFilter"
                 class="global-search"
                 placeholder="Search username, email, age, role or rating... e.g. 123@gmail.com"
+                aria-label="Search user table"
               />
             </span>
             <button class="reset-btn" @click="resetFilters">Reset</button>
+            <button class="export-btn" @click="exportCSV" aria-label="Export user data as CSV">⬇️ Export CSV</button>
             <span class="tip-text">Tip: use Reset button to clear all search.</span>
           </div>
-
-          <!-- 数据表 -->
           <DataTable
             :value="pagedData"
             dataKey="email"
+            aria-label="Admin user data table"
             paginator
             lazy
             :rows="rowsPerPage"
@@ -71,7 +67,6 @@
               </TableHeaderFilter>
               </template>
             </Column>
-
             <!-- Email -->
             <Column field="email" sortable>
               <template #header = "{ sortIcon }">
@@ -87,7 +82,6 @@
                 </TableHeaderFilter>
               </template>
             </Column>
-
             <!-- Age -->
             <Column field="age" sortable>
               <template #header = "{ sortIcon }">
@@ -103,7 +97,6 @@
                 </TableHeaderFilter>
               </template>
             </Column>
-
             <!-- Role -->
             <Column field="role" sortable>
               <template #header = "{ sortIcon }">
@@ -119,7 +112,6 @@
                 </TableHeaderFilter>
               </template>
             </Column>
-
             <!-- Rating -->
             <Column field="rating" sortable>
               <template #header = "{ sortIcon }">
@@ -217,17 +209,40 @@ function onSort(event){
   sortOrder.value = event.sortOrder
 }
 
+function exportCSV() {
+  const rows = filteredUserData.value
+  if (!rows.length) {
+    alert("No data to export.")
+    return
+  }
+
+  const headers = ["Username", "Email", "Age", "Role", "Rating"]
+  const csvContent = [
+    headers.join(","),
+    ...rows.map(u => [u.username, u.email, u.age, u.role, u.rating].join(","))
+  ].join("\n")
+
+  const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
+  const link = document.createElement("a")
+  link.href = URL.createObjectURL(blob)
+  link.setAttribute("download", "user_data.csv")
+  document.body.appendChild(link)
+  link.click()
+  document.body.removeChild(link)
+}
+
 
 async function logout() {
   await signOut(auth)
+  localStorage.removeItem("loggedInUser")
   alert("You have been logged out.")
-  router.push("/login")
+  router.push("/usermain")
 }
 
 onMounted(() => {
   onAuthStateChanged(auth, async (user) => {
     if (!user) {
-      router.push("/login")
+      router.push("/usermain")
       return
     }
 
@@ -400,6 +415,20 @@ function goBackLogin() {
 }
 .reset-btn:hover {
   background: #365a8c;
+}
+
+/* export btn */
+.export-btn {
+  background: #10b981;
+  color: white;
+  border: none;
+  border-radius: 10px;
+  padding: 0.45rem 1rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.export-btn:hover {
+  background: #0d946b;
 }
 
 /* table style */

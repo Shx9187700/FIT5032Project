@@ -16,7 +16,6 @@
 
     <div v-else class="dashboard fade-in">
       <div class="card shadow">
-        <!-- 📊 Summary cards -->
         <div class="summary-cards">
           <div class="summary-card">
             <h3>{{ totalUsers }}</h3>
@@ -31,8 +30,6 @@
             <p>Active Appointments</p>
           </div>
         </div>
-
-        <!-- 🧾 User Table -->
         <div class="section-header">
           <h2 class="section-title">🌿 User Overview</h2>
         </div>
@@ -78,8 +75,6 @@
             <Column field="rating" header="Rating" sortable />
           </DataTable>
         </div>
-
-        <!-- 📈 Appointment Chart -->
         <div class="chart-section">
           <h3 class="chart-title">📈 Appointment Activity (Past 7 Days + Next 7 Days)</h3>
           <ApexChart

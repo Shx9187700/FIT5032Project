@@ -1,12 +1,26 @@
 <template>
   <div class="map-page" role="main">
     <div class="map-controls glassy" role="region" aria-label="Map control panel">
-      <input
-        v-model="endLocation"
-        type="text"
-        placeholder="Enter a mental health service..."
-        aria-label="Destination input field"
-      />
+      <div class="search-wrapper">
+        <input
+          v-model="endLocation"
+          type="text"
+          placeholder="Enter a mental health service..."
+          aria-label="Destination input field"
+          @input="fetchSuggestions"
+          @keyup.enter="selectFirstSuggestion"
+        />
+        <ul v-if="suggestions.length && showSuggestions" class="suggestions">
+          <li
+            v-for="(item, idx) in suggestions"
+            :key="idx"
+            @click="selectSuggestion(item)"
+          >
+            <strong>{{ item.text }}</strong><br />
+            <small>{{ item.place_name }}</small>
+          </li>
+        </ul>
+      </div>
       <button @click="getDirections" aria-label="Get route between your location and destination">🧭 Get Route</button>
       <button @click="searchNearbyServices" aria-label="Find nearby mental health support services">💗 Nearby Support</button>
     </div>
@@ -65,6 +79,8 @@ const endDetails = ref(null)
 const tripInfo = ref(null)
 const showTip = ref(false)
 const nearbyList = ref([])
+const suggestions = ref([])
+const showSuggestions = ref(false)
 
 let userMarker = null
 let routeLayerId = null
@@ -87,7 +103,7 @@ function getAccurateUserLocation() {
       (pos) => {
         const { latitude, longitude, accuracy } = pos.coords
         userCoords.value = [longitude, latitude]
-        console.log(`✅ 定位成功: ${latitude}, ${longitude} (±${accuracy}m)`)
+        console.log(`location successful: ${latitude}, ${longitude} (±${accuracy}m)`)
 
         if (userMarker) userMarker.remove()
         const userIcon = document.createElement("div")
@@ -114,6 +130,48 @@ function getAccurateUserLocation() {
       },
       { enableHighAccuracy: true, timeout: 10000, maximumAge: 0 }
     )
+  }
+}
+
+async function fetchSuggestions() {
+  const q = endLocation.value.trim()
+  if (!q) {
+    suggestions.value = []
+    showSuggestions.value = false
+    return
+  }
+
+  const url = `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
+    q
+  )}.json?country=AU&types=poi,place,address&limit=5&access_token=${mapboxgl.accessToken}`
+
+  try {
+    const res = await fetch(url)
+    const data = await res.json()
+    suggestions.value = data.features || []
+    showSuggestions.value = true
+  } catch (err) {
+    console.error("Suggestion fetch failed:", err)
+  }
+}
+
+function selectSuggestion(item) {
+  endLocation.value = item.text
+  showSuggestions.value = false
+  endCoords.value = item.geometry.coordinates
+  endDetails.value = {
+    name: item.text,
+    fullAddress: item.place_name,
+  }
+  addMarker(endCoords.value, item.place_name)
+  map.value.flyTo({ center: endCoords.value, zoom: 15, speed: 0.8 })
+}
+
+function selectFirstSuggestion() {
+  if (suggestions.value.length > 0) {
+    selectSuggestion(suggestions.value[0])
+  } else {
+    getDirections()
   }
 }
 
@@ -256,6 +314,32 @@ function recenterToUser() {
   backdrop-filter: blur(8px);
   background: rgba(255, 255, 255, 0.85);
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.15);
+}
+
+.suggestions {
+  position: absolute;
+  top: 45px;
+  left: 0;
+  width: 100%;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  z-index: 30;
+}
+.suggestions li {
+  padding: 8px 10px;
+  border-bottom: 1px solid #eee;
+  cursor: pointer;
+}
+.suggestions li:hover {
+  background: #e3f2fd;
+}
+.search-wrapper {
+  position: relative;
+  display: inline-block;
 }
 .map-controls {
   position: absolute;

@@ -64,7 +64,6 @@ async function setRating(star) {
   emit("update:modelValue", star) 
   await setDoc(doc(db, "ratings", currentUser.uid), {
     userId: currentUser.uid,
-    username: currentUser.displayName || "Anonymous",
     email: currentUser.email,
     rating: star,
     timestamp: new Date()

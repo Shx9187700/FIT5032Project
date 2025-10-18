@@ -70,7 +70,6 @@ let userMarker = null
 let routeLayerId = null
 let endMarker = null
 
-// ---------- 初始化地图 ----------
 onMounted(() => {
   map.value = new mapboxgl.Map({
     container: mapContainer.value,
@@ -82,7 +81,6 @@ onMounted(() => {
   getAccurateUserLocation()
 })
 
-// ---------- 高精度定位 ----------
 function getAccurateUserLocation() {
   if (navigator.geolocation) {
     navigator.geolocation.watchPosition(
@@ -105,7 +103,6 @@ function getAccurateUserLocation() {
       },
       async (err) => {
         console.warn("Geolocation error:", err)
-        // fallback：使用 Mapbox autoip
         const res = await fetch(
           `https://api.mapbox.com/geocoding/v5/mapbox.places/autoip.json?access_token=${mapboxgl.accessToken}`
         )
@@ -120,7 +117,6 @@ function getAccurateUserLocation() {
   }
 }
 
-// ---------- 添加标记 ----------
 function addMarker(coords, title) {
   if (endMarker) endMarker.remove()
   endMarker = new mapboxgl.Marker({ color: "#E91E63" })
@@ -129,14 +125,12 @@ function addMarker(coords, title) {
     .addTo(map.value)
 }
 
-// ---------- 路线请求 ----------
 async function requestRoute(profile, start, end) {
   const url = `https://api.mapbox.com/directions/v5/mapbox/${profile}/${start[0]},${start[1]};${end[0]},${end[1]}?geometries=geojson&access_token=${mapboxgl.accessToken}`
   const res = await fetch(url)
   return await res.json()
 }
 
-// ---------- 获取路线 ----------
 async function getDirections() {
   if (!userCoords.value) return alert("Please enable location access first.")
   if (!endLocation.value.trim()) return alert("Please enter a destination.")
@@ -159,7 +153,6 @@ async function getDirections() {
 
   const route = data.routes[0].geometry
 
-  // 清除旧路线
   if (routeLayerId && map.value.getLayer(routeLayerId)) {
     map.value.removeLayer(routeLayerId)
     map.value.removeSource("route")
@@ -187,7 +180,6 @@ async function getDirections() {
   setTimeout(() => (showTip.value = false), 5000)
 }
 
-// ---------- 搜索地理编码 ----------
 async function geocodeLocation(location) {
   const res = await fetch(
     `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(
@@ -199,7 +191,6 @@ async function geocodeLocation(location) {
   return null
 }
 
-// ---------- 搜索附近心理健康服务 ----------
 async function searchNearbyServices() {
   if (!userCoords.value) return
   const [lng, lat] = userCoords.value
@@ -232,7 +223,6 @@ async function searchNearbyServices() {
   }
 }
 
-// ---------- 点击列表项后导航 ----------
 function navigateToPlace(place) {
   endLocation.value = place.text
   endCoords.value = place.geometry.coordinates
@@ -243,7 +233,6 @@ function navigateToPlace(place) {
   getDirections()
 }
 
-// ---------- 回到当前位置 ----------
 function recenterToUser() {
   if (userCoords.value && userMarker)
     map.value.flyTo({ center: userCoords.value, zoom: 15 })
@@ -300,7 +289,6 @@ function recenterToUser() {
   transform: scale(1.05);
 }
 
-/* 左侧侧边栏 */
 .sidebar {
   position: absolute;
   top: 80px;
@@ -347,7 +335,7 @@ function recenterToUser() {
   z-index: 10;
 }
 
-/* My Location 按钮 */
+/* My Location button */
 .recenter-btn {
   position: absolute;
   bottom: 25px;
@@ -367,7 +355,6 @@ function recenterToUser() {
   transform: scale(1.05);
 }
 
-/* 动画 */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.6s;

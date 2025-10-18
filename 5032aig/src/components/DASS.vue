@@ -141,7 +141,6 @@ async function submitAnswers() {
   }
 }
 
-// 再做一次
 function restart() {
   answers.value = Array(questions.length).fill(null)
   result.value = null

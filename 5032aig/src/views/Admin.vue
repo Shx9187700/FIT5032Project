@@ -2,8 +2,10 @@
   <div class="admin-wrapper">
     <header class="admin-header">
       <h1>💙 Admin Dashboard</h1>
+      <button class="btn-logout" @click="logout">Logout</button>
       <p>Monitor users and their emotional well-being insights</p>
     </header>
+
     <div v-if="!isAdmin" class="unauthorized">
       <div class="unauth-card">
         <h3>🚫 Access Denied</h3>
@@ -11,8 +13,26 @@
         <button class="btn-main" @click="goBackLogin">Back to Login</button>
       </div>
     </div>
+
     <div v-else class="dashboard fade-in">
       <div class="card shadow">
+        <!-- 📊 Summary cards -->
+        <div class="summary-cards">
+          <div class="summary-card">
+            <h3>{{ totalUsers }}</h3>
+            <p>Total Users</p>
+          </div>
+          <div class="summary-card">
+            <h3>{{ ratedUsers }}</h3>
+            <p>Rated Users</p>
+          </div>
+          <div class="summary-card">
+            <h3>{{ activeAppointments }}</h3>
+            <p>Active Appointments</p>
+          </div>
+        </div>
+
+        <!-- 🧾 User Table -->
         <div class="section-header">
           <h2 class="section-title">🌿 User Overview</h2>
         </div>
@@ -27,18 +47,17 @@
               <InputText
                 v-model="globalFilter"
                 class="global-search"
-                placeholder="Search username, email, age, role or rating... e.g. 123@gmail.com"
-                aria-label="Search user table"
+                placeholder="Search username, email, age, role or rating..."
               />
             </span>
             <button class="reset-btn" @click="resetFilters">Reset</button>
-            <button class="export-btn" @click="exportCSV" aria-label="Export user data as CSV">⬇️ Export CSV</button>
-            <span class="tip-text">Tip: use Reset button to clear all search.</span>
+            <button class="export-btn" @click="exportCSV">⬇️ Export CSV</button>
+            <button class="export-btn pdf-btn" @click="exportPDF">📄 Export PDF</button>
           </div>
+
           <DataTable
             :value="pagedData"
             dataKey="email"
-            aria-label="Admin user data table"
             paginator
             lazy
             :rows="rowsPerPage"
@@ -52,87 +71,29 @@
             class="soft-table"
             paginatorTemplate="PrevPageLink PageLinks NextPageLink"
           >
-            <!-- Username -->
-            <Column field="username" sortable>
-              <template #header = "{ sortIcon }">
-                <TableHeaderFilter
-                  label="Username"
-                  field="username"
-                  v-model:filterValue="columnFilters.username"
-                  v-model:visible="showFilterBox.username"
-                  @toggle="toggleFilter"
-                  @apply="applyFilter"
-                >
-                  <span v-html="sortIcon"></span>
-              </TableHeaderFilter>
-              </template>
-            </Column>
-            <!-- Email -->
-            <Column field="email" sortable>
-              <template #header = "{ sortIcon }">
-                <TableHeaderFilter
-                  label="Email"
-                  field="email"
-                  v-model:filterValue="columnFilters.email"
-                  v-model:visible="showFilterBox.email"
-                  @toggle="toggleFilter"
-                  @apply="applyFilter"
-                >
-                  <span v-html="sortIcon"></span>
-                </TableHeaderFilter>
-              </template>
-            </Column>
-            <!-- Age -->
-            <Column field="age" sortable>
-              <template #header = "{ sortIcon }">
-                <TableHeaderFilter
-                  label="age"
-                  field="age"
-                  v-model:filterValue="columnFilters.age"
-                  v-model:visible="showFilterBox.age"
-                  @toggle="toggleFilter"
-                  @apply="applyFilter"
-                >
-                  <span v-html="sortIcon"></span>
-                </TableHeaderFilter>
-              </template>
-            </Column>
-            <!-- Role -->
-            <Column field="role" sortable>
-              <template #header = "{ sortIcon }">
-                <TableHeaderFilter
-                  label="role"
-                  field="role"
-                  v-model:filterValue="columnFilters.role"
-                  v-model:visible="showFilterBox.role"
-                  @toggle="toggleFilter"
-                  @apply="applyFilter"
-                >
-                  <span v-html="sortIcon"></span>
-                </TableHeaderFilter>
-              </template>
-            </Column>
-            <!-- Rating -->
-            <Column field="rating" sortable>
-              <template #header = "{ sortIcon }">
-                <TableHeaderFilter
-                  label="rating"
-                  field="rating"
-                  v-model:filterValue="columnFilters.rating"
-                  v-model:visible="showFilterBox.rating"
-                  @toggle="toggleFilter"
-                  @apply="applyFilter"
-                >
-                  <span v-html="sortIcon"></span>
-                </TableHeaderFilter>
-              </template>
-            </Column>
+            <Column field="username" header="Username" sortable />
+            <Column field="email" header="Email" sortable />
+            <Column field="age" header="Age" sortable />
+            <Column field="role" header="Role" sortable />
+            <Column field="rating" header="Rating" sortable />
           </DataTable>
+        </div>
+
+        <!-- 📈 Appointment Chart -->
+        <div class="chart-section">
+          <h3 class="chart-title">📈 Appointment Activity (Past 7 Days + Next 7 Days)</h3>
+          <ApexChart
+            v-if="chartReady"
+            type="line"
+            height="300"
+            width="100%"
+            :options="chartOptions"
+            :series="chartSeries"
+          />
+          <p v-else class="chart-loading">Loading chart...</p>
         </div>
       </div>
     </div>
-
-    <button class="btn-logout" @click="logout">Logout</button>
   </div>
 </template>
 
@@ -145,68 +106,113 @@ import { onAuthStateChanged, signOut } from "firebase/auth"
 import DataTable from "primevue/datatable"
 import Column from "primevue/column"
 import InputText from "primevue/inputtext"
-import TableHeaderFilter from "@/components/TableHeaderFilter.vue"
+import ApexChart from "vue3-apexcharts"
+import jsPDF from "jspdf"
+import autoTable from "jspdf-autotable"
 
 const router = useRouter()
 const isAdmin = ref(false)
 const userData = ref([])
+const totalUsers = ref(0)
+const ratedUsers = ref(0)
+const activeAppointments = ref(0)
 
-// For 10 rows per page
 const first = ref(0)
 const rowsPerPage = ref(10)
+const globalFilter = ref("")
+const sortField = ref(null)
+const sortOrder = ref(null)
+
+const filteredUserData = computed(() => {
+  return userData.value.filter((u) => {
+    const g = globalFilter.value.trim().toLowerCase()
+    if (!g) return true
+    return (
+      u.username?.toLowerCase().includes(g) ||
+      u.email?.toLowerCase().includes(g) ||
+      u.role?.toLowerCase().includes(g) ||
+      u.rating?.toString().includes(g)
+    )
+  })
+})
 
 const pagedData = computed(() => {
   const start = first.value
   const end = start + rowsPerPage.value
-  const pagedData = filteredUserData.value.slice(start, end)
+  return filteredUserData.value.slice(start, end)
+})
+function onPage(e) { first.value = e.first }
+function onSort(e) { sortField.value = e.sortField; sortOrder.value = e.sortOrder }
+function resetFilters() { globalFilter.value = "" }
 
-  const filled = [...pagedData]
-  while (filled.length < rowsPerPage.value){
-    filled.push({ username:"", email:"", age:"", role:"", rating:""})
-  }
-  return filled
+const chartSeries = ref([])
+const chartOptions = ref({
+  chart: { toolbar: { show: false }, zoom: { enabled: false } },
+  xaxis: { categories: [] },
+  stroke: { curve: "smooth", width: 3 },
+  colors: ["#4b7ebc"],
+  dataLabels: { enabled: false },
+  grid: { borderColor: "#e7eaf3" },
+  tooltip: { theme: "light" }
+})
+const chartReady = ref(false)
+
+async function logout() {
+  await signOut(auth)
+  router.push("/usermain")
+}
+
+onMounted(() => {
+  onAuthStateChanged(auth, async (user) => {
+    if (!user) {
+      router.push("/usermain")
+      return
+    }
+    const adminRef = doc(db, "admins", user.uid)
+    const adminSnap = await getDoc(adminRef)
+    if (adminSnap.exists() && adminSnap.data().role === "admin") {
+      isAdmin.value = true
+      await loadDashboardData()
+      await loadChartData()
+    }
+  })
 })
 
-function onPage(event) {
-  first.value = event.first
-}
+async function loadDashboardData() {
+  const usersSnapshot = await getDocs(collection(db, "users"))
+  const ratingsSnapshot = await getDocs(collection(db, "ratings"))
+  const appointmentsSnapshot = await getDocs(collection(db, "appointments"))
 
-//for filter box
-const globalFilter = ref("")
-const columnFilters = ref({
-  username: "",
-  email: "",
-  age: "",
-  role: "",
-  rating: ""
-})
-const showFilterBox = ref({
-  username: false,
-  email: false,
-  age: false,
-  role: false,
-  rating: false
-})
+  const ratingsMap = {}
+  ratingsSnapshot.forEach((doc) => {
+    const data = doc.data()
+    if (data.userId && data.rating) {
+      ratingsMap[data.userId] = data.rating
+    }
+  })
 
-function toggleFilter(key) {
-  Object.keys(showFilterBox.value).forEach(k => showFilterBox.value[k] = false)
-  showFilterBox.value[key] = true
-}
-function applyFilter(key) {
-  showFilterBox.value[key] = false
-}
-function resetFilters() {
-  globalFilter.value = ""
-  Object.keys(columnFilters.value).forEach(k => (columnFilters.value[k] = ""))
-  Object.keys(showFilterBox.value).forEach(k => (showFilterBox.value[k] = false))
-}
+  const appointmentsMap = {}
+  appointmentsSnapshot.forEach((doc) => {
+    const data = doc.data()
+    if (data.userEmail) {
+      appointmentsMap[data.userEmail] = true
+    }
+  })
 
-const sortField = ref(null)
-const sortOrder = ref(null)
+  userData.value = usersSnapshot.docs.map((doc) => {
+    const data = doc.data()
+    return {
+      username: data.username || "Unknown",
+      email: data.email || "",
+      age: data.age || "",
+      role: data.role || "",
+      rating: ratingsMap[doc.id] || "N/A"
+    }
+  })
 
-function onSort(event){
-  sortField.value = event.sortField
-  sortOrder.value = event.sortOrder
+  totalUsers.value = userData.value.filter((u) => u.role === "user").length
+  ratedUsers.value = Object.keys(ratingsMap).length
+  activeAppointments.value = Object.keys(appointmentsMap).length
 }
 
 function exportCSV() {
@@ -215,11 +221,10 @@ function exportCSV() {
     alert("No data to export.")
     return
   }
-
   const headers = ["Username", "Email", "Age", "Role", "Rating"]
   const csvContent = [
     headers.join(","),
-    ...rows.map(u => [u.username, u.email, u.age, u.role, u.rating].join(","))
+    ...rows.map((u) => [u.username, u.email, u.age, u.role, u.rating].join(","))
   ].join("\n")
 
   const blob = new Blob([csvContent], { type: "text/csv;charset=utf-8;" })
@@ -231,92 +236,63 @@ function exportCSV() {
   document.body.removeChild(link)
 }
 
-
-async function logout() {
-  await signOut(auth)
-  localStorage.removeItem("loggedInUser")
-  alert("You have been logged out.")
-  router.push("/usermain")
-}
-
-onMounted(() => {
-  onAuthStateChanged(auth, async (user) => {
-    if (!user) {
-      router.push("/usermain")
-      return
-    }
-
-    const adminRef = doc(db, "admins", user.uid)
-    const adminSnap = await getDoc(adminRef)
-
-    if (adminSnap.exists() && adminSnap.data().role === "admin") {
-      isAdmin.value = true
-      await loadUserData()
-    } else {
-      isAdmin.value = false
-    }
-  })
-})
-
-async function loadUserData() {
-  const usersSnapshot = await getDocs(collection(db, "users"))
-  const ratingsSnapshot = await getDocs(collection(db, "ratings"))
-
-  const ratingsMap = {}
-  ratingsSnapshot.forEach((doc) => {
-    const data = doc.data()
-    ratingsMap[data.userId] = data.rating
-  })
-
-  userData.value = usersSnapshot.docs.map((doc) => {
-    const user = doc.data()
-    return {
-      username: user.username,
-      email: user.email,
-      age: user.age,
-      role: user.role,
-      rating: ratingsMap[doc.id] || "N/A",
-    }
-  })
-}
-
-const filteredUserData = computed(() => {
-  let filtered = userData.value.filter((u) => {
-    const g = globalFilter.value.trim().toLowerCase()
-    if (!g) return true
-    return (
-      u.username?.toLowerCase().includes(g) ||
-      u.email?.toLowerCase().includes(g) ||
-      u.age?.toString().includes(g) ||
-      u.role?.toLowerCase().includes(g) ||
-      u.rating?.toString().includes(g)
-    )
-  })
-
-  filtered = filtered.filter((u) => {
-    return Object.keys(columnFilters.value).every((key) => {
-      const val = columnFilters.value[key].trim().toLowerCase()
-      if (!val) return true
-      return (u[key] || "").toString().toLowerCase().includes(val)
-    })
-  })
-
-  // order logic
-  if (sortField.value) {
-    filtered.sort((a, b) => {
-      const valA = a[sortField.value] ?? ""
-      const valB = b[sortField.value] ?? ""
-      if (typeof valA === "number" && typeof valB === "number") {
-        return sortOrder.value === 1 ? valA - valB : valB - valA
-      }
-      return sortOrder.value === 1
-        ? valA.toString().localeCompare(valB.toString())
-        : valB.toString().localeCompare(valA.toString())
-    })
+function exportPDF() {
+  if (!filteredUserData.value.length) {
+    alert("No data to export.")
+    return
   }
 
-  return filtered
-})
+  const doc = new jsPDF()
+
+  doc.setFontSize(16)
+  doc.text("Admin User Data Report", 14, 20)
+  doc.setFontSize(11)
+  doc.text(`Exported on: ${new Date().toLocaleString()}`, 14, 28)
+
+  const headers = ["Username", "Email", "Age", "Role", "Rating"]
+  const rows = filteredUserData.value.map((u) => [
+    u.username || "",
+    u.email || "",
+    u.age || "",
+    u.role || "",
+    u.rating || "N/A"
+  ])
+
+  autoTable(doc, {
+    startY: 35,
+    head: [headers],
+    body: rows,
+    styles: { fontSize: 10, cellPadding: 3 },
+    headStyles: { fillColor: [70, 118, 181] },
+  })
+  doc.save("user_data.pdf")
+}
+
+async function loadChartData() {
+  const snapshot = await getDocs(collection(db, "appointments"))
+  const all = snapshot.docs.map((doc) => doc.data())
+  const today = new Date()
+  const days = []
+  const counts = []
+
+  for (let i = -7; i <= 7; i++) {
+    const d = new Date(today)
+    d.setDate(today.getDate() + i)
+    const dateStr = d.toISOString().split("T")[0]
+
+    const count = all.filter((a) => {
+      const t = a.start || a.date || a.time || ""
+      return typeof t === "string" && t.startsWith(dateStr)
+    }).length
+
+    days.push(dateStr)
+    counts.push(count)
+  }
+
+  chartOptions.value.xaxis.categories = days
+  chartSeries.value = [{ name: "Appointments", data: counts }]
+  chartReady.value = true
+}
 
 function goBackLogin() {
   router.push("/login")
@@ -343,6 +319,25 @@ function goBackLogin() {
 .admin-header p {
   color: #7a8fa6;
   font-size: 1rem;
+}
+
+.header-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.btn-logout {
+  background-color: #dc3545;
+  border: none;
+  color: #fff;
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.btn-logout:hover {
+  background-color: #b02a37;
 }
 .card {
   background: #ffffff;
@@ -403,6 +398,31 @@ function goBackLogin() {
   font-size: 0.9rem;
   margin-left: 0.5rem;
   white-space: nowrap;
+}
+
+.summary-cards {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 2rem;
+  gap: 1.5rem;
+}
+.summary-card {
+  flex: 1;
+  background: #f2f7fd;
+  border-radius: 14px;
+  text-align: center;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.05);
+}
+.summary-card h3 {
+  color: #4b7ebc;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+}
+.summary-card p {
+  color: #64748b;
+  font-size: 0.95rem;
 }
 
 .reset-btn {
@@ -480,6 +500,16 @@ function goBackLogin() {
   color: #4676b5;
 }
 
+.soft-table :deep(.p-datatable-table) {
+  table-layout: fixed !important;
+  width: 100% !important;
+}
+.table-container {
+  width: 100%;
+  margin: 0 auto;
+  max-width: none;
+}
+
 /* filter btn */
 .filter-btn {
   border: none;
@@ -551,20 +581,6 @@ function goBackLogin() {
 .btn-main:hover {
   background-color: #3a5c8e;
 }
-.btn-logout {
-  background-color: #dc3545;
-  display: block;
-  margin: 2rem auto;
-  border: none;
-  color: #fff;
-  padding: 0.6rem 1.1rem;
-  border-radius: 12px;
-  cursor: pointer;
-  font-weight: 500;
-}
-.btn-logout:hover {
-  background-color: #c82333;
-}
 
 /* 动画 */
 .fade-in {
@@ -579,5 +595,106 @@ function goBackLogin() {
     opacity: 1;
     transform: translateY(0);
   }
+}
+
+.chart-section {
+  margin-top: 2.5rem;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 2rem;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
+}
+.chart-title {
+  font-size: 1.2rem;
+  color: #3f6fa0;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+
+.admin-wrapper {
+  min-height: 100vh;
+  background: linear-gradient(180deg, #f6fbff 0%, #e8f2fa 100%);
+  padding: 3rem 1rem;
+  font-family: "Inter", "Poppins", sans-serif;
+  color: #374151;
+  position: relative;
+}
+
+/* 标题居中 + logout固定右上角 */
+.admin-header {
+  text-align: center;
+  margin-bottom: 2.5rem;
+  position: relative;
+}
+.admin-header h1 {
+  font-size: 2.2rem;
+  font-weight: 700;
+  color: #4676b5;
+}
+.admin-header p {
+  color: #7a8fa6;
+  font-size: 1rem;
+}
+.btn-logout {
+  position: absolute;
+  top: 0;
+  right: 0;
+  background-color: #dc3545;
+  border: none;
+  color: #fff;
+  padding: 0.6rem 1.1rem;
+  border-radius: 10px;
+  cursor: pointer;
+  font-weight: 500;
+  transition: 0.2s;
+}
+.btn-logout:hover {
+  background-color: #b02a37;
+}
+
+/* 卡片样式 */
+.summary-cards {
+  display: flex;
+  justify-content: space-around;
+  margin-bottom: 2rem;
+  gap: 1.5rem;
+}
+.summary-card {
+  flex: 1;
+  background: #f2f7fd;
+  border-radius: 14px;
+  text-align: center;
+  padding: 1.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.05);
+}
+.summary-card h3 {
+  color: #4b7ebc;
+  font-size: 2rem;
+  font-weight: 700;
+  margin: 0;
+}
+.summary-card p {
+  color: #64748b;
+  font-size: 0.95rem;
+}
+
+/* 图表部分 */
+.chart-section {
+  margin-top: 2.5rem;
+  background: #ffffff;
+  border-radius: 18px;
+  padding: 2rem;
+  box-shadow: 0 8px 25px rgba(0, 0, 0, 0.05);
+}
+.chart-title {
+  font-size: 1.2rem;
+  color: #3f6fa0;
+  font-weight: 600;
+  margin-bottom: 1rem;
+}
+.chart-loading {
+  text-align: center;
+  color: #94a3b8;
+  font-style: italic;
 }
 </style>

@@ -56,7 +56,7 @@ function apply() {
   align-items: center;
   justify-content: space-between;
   gap: 0.25rem;
-  min-width: 130px; /* 保证标题不挤 */
+  min-width: 130px;
 }
 
 .header-label {
@@ -88,10 +88,10 @@ function apply() {
 }
 
 .filter-box {
-  position: absolute;              /* 🔹 让它浮动，不挤占布局 */
-  top: 100%;                      /* 出现在表头下方 */
-  left: 0;                        /* 从列左侧开始 */
-  z-index: 50;                    /* 保证浮层在最上层 */
+  position: absolute;  
+  top: 100%;      
+  left: 0;       
+  z-index: 50;  
   background: #ffffff;
   border: 1px solid #d6e4ff;
   border-radius: 10px;
@@ -129,7 +129,6 @@ function apply() {
   to   { opacity: 1; transform: translateY(0); }
 }
 
-/* 淡入动画 */
 .fade-enter-active, .fade-leave-active {
   transition: opacity 0.2s ease;
 }

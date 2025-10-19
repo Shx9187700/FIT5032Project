@@ -284,6 +284,13 @@ const confirmBooking = async () => {
   await addAppointment(email, startDate, endDate);
 };
 
+const cancelBooking = () => {
+  showModal.value = false
+  selectedSlot.value = null
+  selectedDoctor.value = null
+  isBooking.value = false
+}
+
 const addAppointment = async (email, startDate, endDate, replacing = false) => {
   await addDoc(collection(db, "appointments"), {
     doctorId: selectedDoctor.value.id,

@@ -84,13 +84,11 @@ async function sendFeedback() {
   };
 
   try {
-    console.log("📨 Sending payload:", payload);
     const res = await axios.post(
       "https://us-central1-week7-hongxiang.cloudfunctions.net/sendEmail",
       payload,
       { headers: { "Content-Type": "application/json" }, timeout: 20000 }
     );
-    console.log("✅ Response:", res.data);
 
     if (res.data?.success) {
       sent.value = true;
@@ -103,7 +101,7 @@ async function sendFeedback() {
       alert("Send failed: " + (res.data?.error || "Unknown error"));
     }
   } catch (err) {
-    console.error("❌ Send failed:", err);
+    console.error("Send failed:", err);
     alert("Send failed. Please try again.");
   } finally {
     sending.value = false;

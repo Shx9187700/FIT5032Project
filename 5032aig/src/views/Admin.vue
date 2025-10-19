@@ -390,21 +390,7 @@ function exportPDF() {
 
 async function loadChartData() {
   const snapshot = await getDocs(collection(db, "appointments"))
-  const all = snapshot.docs.map((doc) => {
-    const data = doc.data()
-
-    let localStart = ""
-    try {
-      localStart = new Date(data.start).toLocaleString("en-CA", {
-        timeZone: "Australia/Melbourne"
-      })
-    } catch {
-      localStart = data.start
-    }
-
-    return { ...data, localStart }
-  })
-
+  const all = snapshot.docs.map((doc) => doc.data())
   const today = new Date()
   const days = []
   const counts = []
@@ -412,14 +398,11 @@ async function loadChartData() {
   for (let i = -7; i <= 7; i++) {
     const d = new Date(today)
     d.setDate(today.getDate() + i)
-    const dateStr = d.toLocaleDateString("en-CA", { timeZone: "Australia/Melbourne" })
+    const dateStr = d.toISOString().split("T")[0]
 
     const count = all.filter((a) => {
-      if (!a.localStart) return false
-      const localDate = new Date(a.localStart).toLocaleDateString("en-CA", {
-        timeZone: "Australia/Melbourne"
-      })
-      return localDate === dateStr
+      const t = a.start || a.date || a.time || ""
+      return typeof t === "string" && t.startsWith(dateStr)
     }).length
 
     days.push(dateStr)

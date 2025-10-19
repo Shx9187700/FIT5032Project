@@ -258,8 +258,8 @@ async function searchNearbyServices() {
     query
   )}.json?proximity=${lng},${lat}&types=poi&limit=10&access_token=${mapboxgl.accessToken}`
 
-  console.log("🧭 Nearby support URL:", url)
-  console.log("📍 Current userCoords:", userCoords.value)
+  console.log("Nearby support URL:", url)
+  console.log("Current userCoords:", userCoords.value)
   
   const res = await fetch(url)
   const data = await res.json()

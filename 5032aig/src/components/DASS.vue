@@ -135,9 +135,9 @@ async function submitAnswers() {
       depression: result.value.depression,
       timestamp: serverTimestamp(),
     })
-    console.log("✅ DASS result saved to Firestore")
+    console.log("DASS result saved to Firestore")
   } catch (e) {
-    console.error("❌ Firestore save error:", e)
+    console.error("Firestore save error:", e)
   }
 }
 

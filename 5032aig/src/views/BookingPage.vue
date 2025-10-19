@@ -326,9 +326,9 @@ const addAppointment = async (email, startDate, endDate, replacing = false) => {
         },
       ],
     });
-    console.log("[OK] Email notifications sent successfully");
+    console.log("Email notifications sent successfully");
   } catch (err) {
-    console.error("[ERR] Failed to send email notifications:", err);
+    console.error("Failed to send email notifications:", err);
   }
 
   alert(replacing ? "Appointment replaced!" : "Booking confirmed!");

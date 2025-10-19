@@ -54,7 +54,7 @@
 
           <DataTable
             :value="pagedData"
-            dataKey="email"
+            dataKey="id"
             paginator
             lazy
             :rows="rowsPerPage"
@@ -193,26 +193,39 @@ const filteredUserData = computed(() => {
     const g = globalFilter.value.trim().toLowerCase()
     if (!g) return true
     return (
-      u.username?.toLowerCase().includes(g) ||
-      u.email?.toLowerCase().includes(g) ||
-      u.role?.toLowerCase().includes(g) ||
-      u.rating?.toString().includes(g)
+      String(u.username || "").toLowerCase().includes(g) ||
+      String(u.email || "").toLowerCase().includes(g) ||
+      String(u.age || "").toLowerCase().includes(g) ||
+      String(u.role || "").toLowerCase().includes(g) ||
+      String(u.rating || "").toLowerCase().includes(g)
     )
   })
+
   filtered = filtered.filter((u) => {
     return Object.keys(columnFilters.value).every((k) => {
       const val = columnFilters.value[k].trim().toLowerCase()
       if (!val) return true
-      return (u[k] || "").toString().toLowerCase().includes(val)
+      return String(u[k] || "").toLowerCase().includes(val)
     })
   })
+
   if (sortField.value) {
     filtered.sort((a, b) => {
-      const A = a[sortField.value] || ""
-      const B = b[sortField.value] || ""
-      return sortOrder.value === 1 ? A.localeCompare(B) : B.localeCompare(A)
+      const A = a[sortField.value]
+      const B = b[sortField.value]
+
+      if (!isNaN(Number(A)) && !isNaN(Number(B))) {
+        return sortOrder.value === 1 ? Number(A) - Number(B) : Number(B) - Number(A)
+      }
+
+      const strA = String(A || "")
+      const strB = String(B || "")
+      return sortOrder.value === 1
+        ? strA.localeCompare(strB)
+        : strB.localeCompare(strA)
     })
   }
+
   return filtered
 })
 
@@ -308,6 +321,7 @@ async function loadDashboardData() {
   userData.value = usersSnapshot.docs.map((doc) => {
     const data = doc.data()
     return {
+      id: doc.id,
       username: data.username || "Unknown",
       email: data.email || "",
       age: data.age || "",

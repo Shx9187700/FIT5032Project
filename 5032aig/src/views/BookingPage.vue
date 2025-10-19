@@ -111,6 +111,23 @@
         </DataTable>
       </div>
     </div>
+    <div v-if="showReplaceModal" class="modal-overlay">
+      <div class="modal-content">
+        <h3>⚠️ Existing Booking Detected</h3>
+        <p style="margin-bottom: 10px">
+          You already have a booking with <strong>{{ oldAppt.doctorName }}</strong> on<br />
+          {{ new Date(oldAppt.start).toLocaleString() }}.
+        </p>
+        <p>
+          Do you want to replace it with <strong>{{ selectedDoctor.name }}</strong> at<br />
+          {{ selectedSlot.start.toLocaleString() }}?
+        </p>
+        <div class="btn-group" style="margin-top: 15px">
+          <button class="btn-confirm" @click="confirmReplaceBooking">Replace</button>
+          <button class="btn-cancel" @click="showReplaceModal = false">Cancel</button>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -144,9 +161,11 @@ onAuthStateChanged(auth, (user) => (currentUser.value = user));
 const doctors = ref([]);
 const events = ref([]);
 const showModal = ref(false);
+const showReplaceModal = ref(false);
 const selectedSlot = ref(null);
 const selectedDoctor = ref(null);
 const myAppointments = ref([]);
+const oldAppt = ref(null);
 
 let calendar = null;
 let unsubscribe = null;
@@ -227,7 +246,7 @@ const handleSlotClick = (info) => {
   showModal.value = true;
 };
 
-const isBooking = ref(false)
+const isBooking = ref(false);
 
 const confirmBooking = async () => {
   if (isBooking.value) return;
@@ -243,49 +262,29 @@ const confirmBooking = async () => {
   const email = currentUser.value.email;
   const startDate = selectedSlot.value.start;
   const endDate = selectedSlot.value.end;
-  const selectedDate = startDate.toISOString().split("T")[0];
 
   const snapshot = await getDocs(
     query(collection(db, "appointments"), where("userEmail", "==", email))
   );
-
   const sameDayApptDoc = snapshot.docs.find((d) => {
     const appt = d.data();
-    const apptDate = new Date(appt.start).toISOString().split("T")[0];
+    const apptDate = new Date(appt.start).toLocaleDateString("en-CA");
+    const selectedDate = startDate.toLocaleDateString("en-CA");
     return apptDate === selectedDate;
   });
 
   if (sameDayApptDoc) {
-    const old = sameDayApptDoc.data();
-    const oldId = sameDayApptDoc.id;
-
-    const confirmReplace = confirm(
-      `⚠️ You already have a booking with ${old.doctorName} on ${new Date(old.start).toLocaleString()}.\n\n` +
-      `Do you want to replace it with ${selectedDoctor.value.name} at ${selectedSlot.value.start.toLocaleString()}?`
-    );
-
-    if (!confirmReplace) {
-      alert("❌ Booking unchanged.");
-      showModal.value = false;
-      isBooking.value = false;
-      return;
-    }
-
-    await deleteDoc(doc(db, "appointments", oldId));
-
-    axios.post(
-      "https://us-central1-week7-hongxiang.cloudfunctions.net/sendEmail",
-      {
-        bulk: [
-          { to: old.userEmail, subject: "Booking Replaced", text: `Your previous booking with ${old.doctorName} on ${new Date(old.start).toLocaleString()} has been replaced.` },
-          { to: old.doctorEmail || "doctor@example.com", subject: "Booking Replaced", text: `User ${old.userEmail} changed their booking on ${new Date(old.start).toLocaleString()}.` },
-          { to: "hsha0055@student.monash.edu", subject: `Booking replaced by ${old.userEmail}`, text: `User ${old.userEmail} replaced their booking with ${old.doctorName}.` },
-        ],
-      },
-      { headers: { "Content-Type": "application/json" } }
-    ).catch(err => console.error("❌ Replace email failed:", err));
+    oldAppt.value = { id: sameDayApptDoc.id, ...sameDayApptDoc.data() };
+    showModal.value = false;
+    showReplaceModal.value = true;
+    isBooking.value = false;
+    return;
   }
 
+  await addAppointment(email, startDate, endDate);
+};
+
+const addAppointment = async (email, startDate, endDate, replacing = false) => {
   await addDoc(collection(db, "appointments"), {
     doctorId: selectedDoctor.value.id,
     doctorName: selectedDoctor.value.name,
@@ -295,50 +294,24 @@ const confirmBooking = async () => {
     createdAt: new Date().toISOString(),
   });
 
+  alert(replacing ? "🔁 Appointment replaced!" : "✅ Booking confirmed!");
   showModal.value = false;
-  alert("✅ Booking confirmed!");
+  showReplaceModal.value = false;
   refreshCalendar();
   isBooking.value = false;
-
-  const timeText = `${selectedDoctor.value.name} on ${startDate.toLocaleString()}`;
-  axios.post(
-    "https://us-central1-week7-hongxiang.cloudfunctions.net/sendEmail",
-    {
-      bulk: [
-        { to: email, subject: "Booking Confirmation", text: `Your appointment with ${timeText} has been successfully booked.` },
-        { to: selectedDoctor.value.email, subject: "New Appointment Booked", text: `User ${email} booked your session at ${timeText}.` },
-        { to: "hsha0055@student.monash.edu", subject: `New Booking from ${email}`, text: `User ${email} booked ${timeText}.` },
-      ],
-    },
-    { headers: { "Content-Type": "application/json" } }
-  ).catch(err => console.error("❌ Email failed:", err));
 };
 
+const confirmReplaceBooking = async () => {
+  const email = currentUser.value.email;
+  await deleteDoc(doc(db, "appointments", oldAppt.value.id));
+  await addAppointment(email, selectedSlot.value.start, selectedSlot.value.end, true);
+};
 
 async function confirmCancel(appt) {
   const confirmed = confirm(`Cancel your booking with ${appt.doctorName} on ${new Date(appt.start).toLocaleString()}?`);
   if (!confirmed) return;
 
   await deleteDoc(doc(db, "appointments", appt.id));
-
-  const payload = {
-    bulk: [
-      { to: appt.userEmail, subject: "Booking Cancelled", text: `Your booking with ${appt.doctorName} on ${new Date(appt.start).toLocaleString()} has been cancelled.` },
-      { to: appt.doctorEmail || "doctor@example.com", subject: "Booking Cancelled", text: `User ${appt.userEmail} cancelled their booking on ${new Date(appt.start).toLocaleString()}.` },
-      { to: "hsha0055@student.monash.edu", subject: `Booking Cancelled by ${appt.userEmail}`, text: `User ${appt.userEmail} cancelled their booking with ${appt.doctorName}.` },
-    ],
-  };
-
-  try {
-    await axios.post(
-      "https://us-central1-week7-hongxiang.cloudfunctions.net/sendEmail",
-      payload,
-      { headers: { "Content-Type": "application/json" }, timeout: 20000 }
-    );
-  } catch (err) {
-    console.error("❌ Cancel email failed:", err);
-  }
-
   alert("🗑️ Booking cancelled successfully.");
   refreshCalendar();
 }
@@ -363,22 +336,14 @@ function resetFilters() {
   Object.keys(columnFilters.value).forEach((k) => (columnFilters.value[k] = ""));
 }
 
-function onPage(e) {
-  first.value = e.first;
-}
-function onSort(e) {
-  sortField.value = e.sortField;
-  sortOrder.value = e.sortOrder;
-}
+function onPage(e) { first.value = e.first; }
+function onSort(e) { sortField.value = e.sortField; sortOrder.value = e.sortOrder; }
 
 const filteredAppointments = computed(() => {
   let filtered = myAppointments.value.filter((a) => {
     const g = globalFilter.value.trim().toLowerCase();
     if (!g) return true;
-    return (
-      a.doctorName?.toLowerCase().includes(g) ||
-      a.start?.toLowerCase().includes(g)
-    );
+    return a.doctorName?.toLowerCase().includes(g) || a.start?.toLowerCase().includes(g);
   });
   filtered = filtered.filter((a) => {
     return Object.keys(columnFilters.value).every((k) => {

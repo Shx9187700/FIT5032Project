@@ -68,11 +68,80 @@
             class="soft-table"
             paginatorTemplate="PrevPageLink PageLinks NextPageLink"
           >
-            <Column field="username" header="Username" sortable />
-            <Column field="email" header="Email" sortable />
-            <Column field="age" header="Age" sortable />
-            <Column field="role" header="Role" sortable />
-            <Column field="rating" header="Rating" sortable />
+            <Column field="username" sortable>
+              <template #header="{ sortIcon }">
+                <TableHeaderFilter
+                  label="Username"
+                  field="username"
+                  v-model:filterValue="columnFilters.username"
+                  v-model:visible="showFilterBox.username"
+                  @toggle="toggleFilter"
+                  @apply="applyFilter"
+                >
+                  <span v-html="sortIcon"></span>
+                </TableHeaderFilter>
+              </template>
+            </Column>
+
+            <Column field="email" sortable>
+              <template #header="{ sortIcon }">
+                <TableHeaderFilter
+                  label="Email"
+                  field="email"
+                  v-model:filterValue="columnFilters.email"
+                  v-model:visible="showFilterBox.email"
+                  @toggle="toggleFilter"
+                  @apply="applyFilter"
+                >
+                  <span v-html="sortIcon"></span>
+                </TableHeaderFilter>
+              </template>
+            </Column>
+
+            <Column field="age" sortable>
+              <template #header="{ sortIcon }">
+                <TableHeaderFilter
+                  label="Age"
+                  field="age"
+                  v-model:filterValue="columnFilters.age"
+                  v-model:visible="showFilterBox.age"
+                  @toggle="toggleFilter"
+                  @apply="applyFilter"
+                >
+                  <span v-html="sortIcon"></span>
+                </TableHeaderFilter>
+              </template>
+            </Column>
+
+            <Column field="role" sortable>
+              <template #header="{ sortIcon }">
+                <TableHeaderFilter
+                  label="Role"
+                  field="role"
+                  v-model:filterValue="columnFilters.role"
+                  v-model:visible="showFilterBox.role"
+                  @toggle="toggleFilter"
+                  @apply="applyFilter"
+                >
+                  <span v-html="sortIcon"></span>
+                </TableHeaderFilter>
+              </template>
+            </Column>
+
+            <Column field="rating" sortable>
+              <template #header="{ sortIcon }">
+                <TableHeaderFilter
+                  label="Rating"
+                  field="rating"
+                  v-model:filterValue="columnFilters.rating"
+                  v-model:visible="showFilterBox.rating"
+                  @toggle="toggleFilter"
+                  @apply="applyFilter"
+                >
+                  <span v-html="sortIcon"></span>
+                </TableHeaderFilter>
+              </template>
+            </Column>
           </DataTable>
         </div>
         <div class="chart-section">
@@ -104,6 +173,7 @@ import InputText from "primevue/inputtext"
 import ApexChart from "vue3-apexcharts"
 import jsPDF from "jspdf"
 import autoTable from "jspdf-autotable"
+import TableHeaderFilter from "@/components/TableHeaderFilter.vue"
 
 const router = useRouter()
 const isAdmin = ref(false)
@@ -119,7 +189,7 @@ const sortField = ref(null)
 const sortOrder = ref(null)
 
 const filteredUserData = computed(() => {
-  return userData.value.filter((u) => {
+  let filtered = userData.value.filter((u) => {
     const g = globalFilter.value.trim().toLowerCase()
     if (!g) return true
     return (
@@ -129,7 +199,49 @@ const filteredUserData = computed(() => {
       u.rating?.toString().includes(g)
     )
   })
+  filtered = filtered.filter((u) => {
+    return Object.keys(columnFilters.value).every((k) => {
+      const val = columnFilters.value[k].trim().toLowerCase()
+      if (!val) return true
+      return (u[k] || "").toString().toLowerCase().includes(val)
+    })
+  })
+  if (sortField.value) {
+    filtered.sort((a, b) => {
+      const A = a[sortField.value] || ""
+      const B = b[sortField.value] || ""
+      return sortOrder.value === 1 ? A.localeCompare(B) : B.localeCompare(A)
+    })
+  }
+  return filtered
 })
+
+const columnFilters = ref({
+  username: "",
+  email: "",
+  age: "",
+  role: "",
+  rating: ""
+})
+const showFilterBox = ref({
+  username: false,
+  email: false,
+  age: false,
+  role: false,
+  rating: false
+})
+
+function toggleFilter(key) {
+  Object.keys(showFilterBox.value).forEach(k => (showFilterBox.value[k] = false))
+  showFilterBox.value[key] = true
+}
+function applyFilter(key) {
+  showFilterBox.value[key] = false
+}
+function resetFilters() {
+  globalFilter.value = ""
+  Object.keys(columnFilters.value).forEach(k => (columnFilters.value[k] = ""))
+}
 
 const pagedData = computed(() => {
   const start = first.value
@@ -138,7 +250,6 @@ const pagedData = computed(() => {
 })
 function onPage(e) { first.value = e.first }
 function onSort(e) { sortField.value = e.sortField; sortOrder.value = e.sortOrder }
-function resetFilters() { globalFilter.value = "" }
 
 const chartSeries = ref([])
 const chartOptions = ref({

@@ -154,6 +154,7 @@ import {
   doc,
 } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
+import { getDoc } from "firebase/firestore";
 
 const currentUser = ref(null);
 onAuthStateChanged(auth, (user) => (currentUser.value = user));
@@ -301,7 +302,36 @@ const addAppointment = async (email, startDate, endDate, replacing = false) => {
     createdAt: new Date().toISOString(),
   });
 
-  alert(replacing ? "🔁 Appointment replaced!" : "✅ Booking confirmed!");
+  const doctorRef = doc(db, "doctors", selectedDoctor.value.id);
+  const doctorSnap = await getDoc(doctorRef);
+  const doctorEmail = doctorSnap.exists() ? doctorSnap.data().email : "doctor@example.com";
+
+  try {
+    await axios.post("https://us-central1-YOUR_PROJECT_ID.cloudfunctions.net/sendEmail", {
+      bulk: [
+        {
+          to: email,
+          subject: "Appointment Confirmed",
+          text: `You booked an appointment with ${selectedDoctor.value.name} on ${startDate.toLocaleString()}.`,
+        },
+        {
+          to: doctorEmail,
+          subject: "New Appointment Booked",
+          text: `A new appointment has been booked by ${email} on ${startDate.toLocaleString()}.`,
+        },
+        {
+          to: "hsha0055@student.monash.edu",
+          subject: "Admin Notification: Appointment",
+          text: `User ${email} booked ${selectedDoctor.value.name} at ${startDate.toLocaleString()}.`,
+        },
+      ],
+    });
+    console.log("[OK] Email notifications sent successfully");
+  } catch (err) {
+    console.error("[ERR] Failed to send email notifications:", err);
+  }
+
+  alert(replacing ? "Appointment replaced!" : "Booking confirmed!");
   showModal.value = false;
   showReplaceModal.value = false;
   refreshCalendar();
@@ -319,7 +349,7 @@ async function confirmCancel(appt) {
   if (!confirmed) return;
 
   await deleteDoc(doc(db, "appointments", appt.id));
-  alert("🗑️ Booking cancelled successfully.");
+  alert("Booking cancelled successfully.");
   refreshCalendar();
 }
 

@@ -227,50 +227,93 @@ const handleSlotClick = (info) => {
   showModal.value = true;
 };
 
+const isBooking = ref(false)
+
 const confirmBooking = async () => {
+  if (isBooking.value) return;
+  isBooking.value = true;
+
   if (!currentUser.value) {
     alert("Please log in first.");
     showModal.value = false;
+    isBooking.value = false;
     return;
   }
 
-  const startISO = selectedSlot.value.start.toLocaleString("sv-SE");
-  const endISO = selectedSlot.value.end.toLocaleString("sv-SE");
   const email = currentUser.value.email;
+  const startDate = selectedSlot.value.start;
+  const endDate = selectedSlot.value.end;
+  const selectedDate = startDate.toISOString().split("T")[0];
+
+  const snapshot = await getDocs(
+    query(collection(db, "appointments"), where("userEmail", "==", email))
+  );
+
+  const sameDayApptDoc = snapshot.docs.find((d) => {
+    const appt = d.data();
+    const apptDate = new Date(appt.start).toISOString().split("T")[0];
+    return apptDate === selectedDate;
+  });
+
+  if (sameDayApptDoc) {
+    const old = sameDayApptDoc.data();
+    const oldId = sameDayApptDoc.id;
+
+    const confirmReplace = confirm(
+      `⚠️ You already have a booking with ${old.doctorName} on ${new Date(old.start).toLocaleString()}.\n\n` +
+      `Do you want to replace it with ${selectedDoctor.value.name} at ${selectedSlot.value.start.toLocaleString()}?`
+    );
+
+    if (!confirmReplace) {
+      alert("❌ Booking unchanged.");
+      showModal.value = false;
+      isBooking.value = false;
+      return;
+    }
+
+    await deleteDoc(doc(db, "appointments", oldId));
+
+    axios.post(
+      "https://us-central1-week7-hongxiang.cloudfunctions.net/sendEmail",
+      {
+        bulk: [
+          { to: old.userEmail, subject: "Booking Replaced", text: `Your previous booking with ${old.doctorName} on ${new Date(old.start).toLocaleString()} has been replaced.` },
+          { to: old.doctorEmail || "doctor@example.com", subject: "Booking Replaced", text: `User ${old.userEmail} changed their booking on ${new Date(old.start).toLocaleString()}.` },
+          { to: "hsha0055@student.monash.edu", subject: `Booking replaced by ${old.userEmail}`, text: `User ${old.userEmail} replaced their booking with ${old.doctorName}.` },
+        ],
+      },
+      { headers: { "Content-Type": "application/json" } }
+    ).catch(err => console.error("❌ Replace email failed:", err));
+  }
 
   await addDoc(collection(db, "appointments"), {
     doctorId: selectedDoctor.value.id,
     doctorName: selectedDoctor.value.name,
-    start: startISO,
-    end: endISO,
+    start: startDate.toISOString(),
+    end: endDate.toISOString(),
     userEmail: email,
     createdAt: new Date().toISOString(),
   });
 
-  const timeText = `${selectedDoctor.value.name} on ${selectedSlot.value.start.toLocaleString()}`;
-
-  const payload = {
-    bulk: [
-      { to: email, subject: "Booking Confirmation", text: `Your appointment with ${timeText} has been successfully booked.` },
-      { to: selectedDoctor.value.email, subject: "New Appointment Booked", text: `User ${email} booked your session at ${timeText}.` },
-      { to: "hsha0055@student.monash.edu", subject: `New Booking from ${email}`, text: `User ${email} booked ${timeText}.` },
-    ],
-  };
-
-  try {
-    await axios.post(
-      "https://us-central1-week7-hongxiang.cloudfunctions.net/sendEmail",
-      payload,
-      { headers: { "Content-Type": "application/json" }, timeout: 20000 }
-    );
-  } catch (err) {
-    console.error("❌ Email failed:", err);
-  }
-
-  alert("✅ Booking confirmed!");
   showModal.value = false;
+  alert("✅ Booking confirmed!");
   refreshCalendar();
+  isBooking.value = false;
+
+  const timeText = `${selectedDoctor.value.name} on ${startDate.toLocaleString()}`;
+  axios.post(
+    "https://us-central1-week7-hongxiang.cloudfunctions.net/sendEmail",
+    {
+      bulk: [
+        { to: email, subject: "Booking Confirmation", text: `Your appointment with ${timeText} has been successfully booked.` },
+        { to: selectedDoctor.value.email, subject: "New Appointment Booked", text: `User ${email} booked your session at ${timeText}.` },
+        { to: "hsha0055@student.monash.edu", subject: `New Booking from ${email}`, text: `User ${email} booked ${timeText}.` },
+      ],
+    },
+    { headers: { "Content-Type": "application/json" } }
+  ).catch(err => console.error("❌ Email failed:", err));
 };
+
 
 async function confirmCancel(appt) {
   const confirmed = confirm(`Cancel your booking with ${appt.doctorName} on ${new Date(appt.start).toLocaleString()}?`);
